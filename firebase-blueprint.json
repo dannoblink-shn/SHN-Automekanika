@@ -1,0 +1,725 @@
+{
+  "entities": {
+    "Shop": {
+      "title": "Shop",
+      "description": "Automotive repair shop workspace configuration and owner profile.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "taxRate": {
+          "type": "number"
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["USD", "VES", "MXN", "EUR", "COP", "ARS", "CLP", "PEN"]
+        },
+        "baysCount": {
+          "type": "number"
+        },
+        "bcvRate": {
+          "type": "number"
+        },
+        "bcvUpdatedAt": {
+          "type": "string",
+          "maxLength": 50
+        },
+        "bcvSource": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "mechanicCommissionRate": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "name", "phone", "address", "taxRate", "currency", "baysCount", "createdAt", "updatedAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Workshop client record with contact details.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "phone": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 30
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "taxId": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "name", "phone", "email", "taxId", "notes", "createdAt", "updatedAt"]
+    },
+    "Vehicle": {
+      "title": "Vehicle",
+      "description": "Customer vehicle registered in the workshop.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "plate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "make": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "year": {
+          "type": "number"
+        },
+        "vin": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "color": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "fuelType": {
+          "type": "string",
+          "enum": ["Gasolina", "Diésel", "Híbrido", "Eléctrico", "GLP"]
+        },
+        "mileage": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "customerId", "customerName", "plate", "make", "model", "year", "vin", "color", "fuelType", "mileage", "createdAt", "updatedAt"]
+    },
+    "Mechanic": {
+      "title": "Mechanic",
+      "description": "Workshop technician and bay assignment.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "specialty": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "bay": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Disponible", "En Servicio", "Descanso"]
+        },
+        "commissionRate": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "name", "specialty", "bay", "phone", "status", "createdAt", "updatedAt"]
+    },
+    "Part": {
+      "title": "Part",
+      "description": "Automotive spare part or consumable item in shop inventory.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sku": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Filtros", "Frenos", "Lubricantes", "Motor", "Suspensión", "Eléctrico", "Neumáticos", "Otros"]
+        },
+        "stock": {
+          "type": "number"
+        },
+        "minStock": {
+          "type": "number"
+        },
+        "costPrice": {
+          "type": "number"
+        },
+        "salePrice": {
+          "type": "number"
+        },
+        "location": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "sku", "name", "category", "stock", "minStock", "costPrice", "salePrice", "location", "createdAt", "updatedAt"]
+    },
+    "WorkOrder": {
+      "title": "WorkOrder",
+      "description": "Repair work order tracking vehicle service lifecycle and billing.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderNumber": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 30
+        },
+        "customerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "vehicleId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "vehicleSummary": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "plate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "mechanicId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "mechanicName": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "bay": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "mileageIn": {
+          "type": "number"
+        },
+        "symptom": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 500
+        },
+        "diagnosis": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["Normal", "Urgente"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Recibido", "Diagnóstico", "En Reparación", "Esperando Repuesto", "Listo", "Entregado", "Cancelado"]
+        },
+        "promisedDate": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "laborTotal": {
+          "type": "number"
+        },
+        "partsTotal": {
+          "type": "number"
+        },
+        "taxAmount": {
+          "type": "number"
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "amountPaid": {
+          "type": "number"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["Pendiente", "Abonado", "Pagado"]
+        },
+        "paymentNotes": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "mechanicCommissionRate": {
+          "type": "number"
+        },
+        "mechanicPaid": {
+          "type": "number"
+        },
+        "mechanicPaymentStatus": {
+          "type": "string",
+          "enum": ["Pendiente", "Abonado", "Pagado"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId", "orderNumber", "customerId", "customerName", "vehicleId", "vehicleSummary",
+        "plate", "mechanicId", "mechanicName", "bay", "mileageIn", "symptom", "diagnosis",
+        "priority", "status", "promisedDate", "laborTotal", "partsTotal", "taxAmount",
+        "totalAmount", "createdAt", "updatedAt"
+      ]
+    },
+    "WorkOrderItem": {
+      "title": "WorkOrderItem",
+      "description": "Labor or part line item inside a work order subcollection.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Mano de Obra", "Repuesto"]
+        },
+        "partId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "unitPrice": {
+          "type": "number"
+        },
+        "costPrice": {
+          "type": "number"
+        },
+        "subtotal": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "orderId", "type", "partId", "description", "quantity", "unitPrice", "subtotal", "createdAt", "updatedAt"]
+    },
+    "Appointment": {
+      "title": "Appointment",
+      "description": "Scheduled workshop service appointment.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "vehicleId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "vehicleSummary": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "plate": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 20
+        },
+        "serviceType": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "scheduledDate": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 20
+        },
+        "scheduledTime": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 10
+        },
+        "bay": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Programada", "Confirmada", "En Taller", "Completada", "Cancelada"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId", "customerId", "customerName", "vehicleId", "vehicleSummary",
+        "plate", "serviceType", "scheduledDate", "scheduledTime", "bay",
+        "notes", "status", "createdAt", "updatedAt"
+      ]
+    },
+    "Quote": {
+      "title": "Quote",
+      "description": "Itemized service and spare parts budget/estimate.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "quoteNumber": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 30
+        },
+        "customerId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "customerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "customerPhone": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "vehicleId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "vehicleSummary": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "plate": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "validUntil": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Borrador", "Enviado", "Aprobado", "Rechazado", "Convertido"]
+        },
+        "convertedOrderId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "laborTotal": {
+          "type": "number"
+        },
+        "partsTotal": {
+          "type": "number"
+        },
+        "taxAmount": {
+          "type": "number"
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "amountPaid": {
+          "type": "number"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["Pendiente", "Abonado", "Pagado"]
+        },
+        "paymentNotes": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId", "quoteNumber", "customerId", "customerName", "customerPhone",
+        "vehicleId", "vehicleSummary", "plate", "validUntil", "notes", "status",
+        "convertedOrderId", "laborTotal", "partsTotal", "taxAmount", "totalAmount",
+        "createdAt", "updatedAt"
+      ]
+    },
+    "QuoteItem": {
+      "title": "QuoteItem",
+      "description": "Individual part or labor item inside a budget/quote.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "quoteId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["Mano de Obra", "Repuesto"]
+        },
+        "partId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "description": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "quantity": {
+          "type": "number"
+        },
+        "unitPrice": {
+          "type": "number"
+        },
+        "costPrice": {
+          "type": "number"
+        },
+        "subtotal": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "quoteId", "type", "partId", "description", "quantity", "unitPrice", "subtotal", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/shops/{shopId}": {
+      "schema": { "$ref": "#/entities/Shop" },
+      "description": "Root workspace document for an automotive repair shop."
+    },
+    "/shops/{shopId}/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Shop customers directory."
+    },
+    "/shops/{shopId}/vehicles/{vehicleId}": {
+      "schema": { "$ref": "#/entities/Vehicle" },
+      "description": "Vehicles belonging to shop customers."
+    },
+    "/shops/{shopId}/mechanics/{mechanicId}": {
+      "schema": { "$ref": "#/entities/Mechanic" },
+      "description": "Workshop mechanics and bay assignments."
+    },
+    "/shops/{shopId}/parts/{partId}": {
+      "schema": { "$ref": "#/entities/Part" },
+      "description": "Spare parts inventory."
+    },
+    "/shops/{shopId}/workOrders/{orderId}": {
+      "schema": { "$ref": "#/entities/WorkOrder" },
+      "description": "Active and historical repair work orders."
+    },
+    "/shops/{shopId}/workOrders/{orderId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/WorkOrderItem" },
+      "description": "Line items (labor and spare parts) for a work order."
+    },
+    "/shops/{shopId}/appointments/{appointmentId}": {
+      "schema": { "$ref": "#/entities/Appointment" },
+      "description": "Scheduled service appointments."
+    },
+    "/shops/{shopId}/quotes/{quoteId}": {
+      "schema": { "$ref": "#/entities/Quote" },
+      "description": "Itemized service and parts budgets."
+    },
+    "/shops/{shopId}/quotes/{quoteId}/items/{itemId}": {
+      "schema": { "$ref": "#/entities/QuoteItem" },
+      "description": "Individual parts and labor line items inside a quote."
+    }
+  }
+}

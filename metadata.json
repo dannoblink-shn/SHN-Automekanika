@@ -1,0 +1,6 @@
+{
+  "name": "Taller Axis — Gestión de Taller Automotriz",
+  "description": "Sistema integral de gestión para talleres automotrices: órdenes de trabajo, clientes, vehículos, inventario de repuestos, citas y control de bahías.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

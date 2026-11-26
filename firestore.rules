@@ -1,0 +1,591 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'DannoBlink@gmail.com'
+      );
+    }
+
+    function isShopOwner(shopId) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/shops/$(shopId)).data.ownerId == request.auth.uid;
+    }
+
+    function isValidNumberRange(val, minVal, maxVal) {
+      return (val is int || val is float) && val >= minVal && val <= maxVal;
+    }
+
+    // --- Validation Blueprints ---
+    function isValidShop(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'phone', 'address', 'taxRate', 'currency', 'baysCount', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'name', 'phone', 'address', 'taxRate', 'currency', 'baysCount', 'bcvRate', 'bcvUpdatedAt', 'bcvSource', 'mechanicCommissionRate', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 30
+        && data.address is string && data.address.size() <= 200
+        && isValidNumberRange(data.taxRate, 0, 50)
+        && data.currency in ['USD', 'VES', 'MXN', 'EUR', 'COP', 'ARS', 'CLP', 'PEN']
+        && isValidNumberRange(data.baysCount, 1, 50)
+        && (!('bcvRate' in data) || isValidNumberRange(data.bcvRate, 0.01, 1000000))
+        && (!('bcvUpdatedAt' in data) || (data.bcvUpdatedAt is string && data.bcvUpdatedAt.size() <= 50))
+        && (!('bcvSource' in data) || (data.bcvSource is string && data.bcvSource.size() <= 60))
+        && (!('mechanicCommissionRate' in data) || isValidNumberRange(data.mechanicCommissionRate, 0, 100))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'phone', 'email', 'taxId', 'notes', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'name', 'phone', 'email', 'taxId', 'notes', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 100
+        && data.phone is string && data.phone.size() >= 5 && data.phone.size() <= 30
+        && data.email is string && data.email.size() <= 120
+        && data.taxId is string && data.taxId.size() <= 40
+        && data.notes is string && data.notes.size() <= 500
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidVehicle(data) {
+      return data.keys().hasAll(['ownerId', 'customerId', 'customerName', 'plate', 'make', 'model', 'year', 'vin', 'color', 'fuelType', 'mileage', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'customerId', 'customerName', 'plate', 'make', 'model', 'year', 'vin', 'color', 'fuelType', 'mileage', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && isValidId(data.customerId)
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 100
+        && data.plate is string && data.plate.size() >= 2 && data.plate.size() <= 20
+        && data.make is string && data.make.size() >= 1 && data.make.size() <= 50
+        && data.model is string && data.model.size() >= 1 && data.model.size() <= 60
+        && isValidNumberRange(data.year, 1950, 2035)
+        && data.vin is string && data.vin.size() <= 30
+        && data.color is string && data.color.size() <= 30
+        && data.fuelType in ['Gasolina', 'Diésel', 'Híbrido', 'Eléctrico', 'GLP']
+        && isValidNumberRange(data.mileage, 0, 2000000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMechanic(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'specialty', 'bay', 'phone', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'name', 'specialty', 'bay', 'phone', 'status', 'commissionRate', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 80
+        && data.specialty is string && data.specialty.size() >= 2 && data.specialty.size() <= 80
+        && data.bay is string && data.bay.size() <= 30
+        && data.phone is string && data.phone.size() <= 30
+        && data.status in ['Disponible', 'En Servicio', 'Descanso']
+        && (!('commissionRate' in data) || isValidNumberRange(data.commissionRate, 0, 100))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPart(data) {
+      return data.keys().hasAll(['ownerId', 'sku', 'name', 'category', 'stock', 'minStock', 'costPrice', 'salePrice', 'location', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'sku', 'name', 'category', 'stock', 'minStock', 'costPrice', 'salePrice', 'location', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.sku is string && data.sku.size() >= 1 && data.sku.size() <= 40
+        && data.name is string && data.name.size() >= 2 && data.name.size() <= 120
+        && data.category in ['Filtros', 'Frenos', 'Lubricantes', 'Motor', 'Suspensión', 'Eléctrico', 'Neumáticos', 'Otros']
+        && isValidNumberRange(data.stock, 0, 100000)
+        && isValidNumberRange(data.minStock, 0, 100000)
+        && isValidNumberRange(data.costPrice, 0, 1000000)
+        && isValidNumberRange(data.salePrice, 0, 1000000)
+        && data.location is string && data.location.size() <= 40
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkOrder(data) {
+      return data.keys().hasAll([
+          'ownerId', 'orderNumber', 'customerId', 'customerName', 'vehicleId', 'vehicleSummary',
+          'plate', 'mechanicId', 'mechanicName', 'bay', 'mileageIn', 'symptom', 'diagnosis',
+          'priority', 'status', 'promisedDate', 'laborTotal', 'partsTotal', 'taxAmount',
+          'totalAmount', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'orderNumber', 'customerId', 'customerName', 'vehicleId', 'vehicleSummary',
+          'plate', 'mechanicId', 'mechanicName', 'bay', 'mileageIn', 'symptom', 'diagnosis',
+          'priority', 'status', 'promisedDate', 'laborTotal', 'partsTotal', 'taxAmount',
+          'totalAmount', 'amountPaid', 'paymentStatus', 'paymentNotes',
+          'mechanicCommissionRate', 'mechanicPaid', 'mechanicPaymentStatus',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.orderNumber is string && data.orderNumber.size() >= 2 && data.orderNumber.size() <= 30
+        && isValidId(data.customerId)
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 100
+        && isValidId(data.vehicleId)
+        && data.vehicleSummary is string && data.vehicleSummary.size() >= 2 && data.vehicleSummary.size() <= 120
+        && data.plate is string && data.plate.size() >= 2 && data.plate.size() <= 20
+        && data.mechanicId is string && data.mechanicId.size() <= 128
+        && data.mechanicName is string && data.mechanicName.size() <= 80
+        && data.bay is string && data.bay.size() <= 30
+        && isValidNumberRange(data.mileageIn, 0, 2000000)
+        && data.symptom is string && data.symptom.size() >= 2 && data.symptom.size() <= 500
+        && data.diagnosis is string && data.diagnosis.size() <= 800
+        && data.priority in ['Normal', 'Urgente']
+        && data.status in ['Recibido', 'Diagnóstico', 'En Reparación', 'Esperando Repuesto', 'Listo', 'Entregado', 'Cancelado']
+        && data.promisedDate is string && data.promisedDate.size() <= 30
+        && isValidNumberRange(data.laborTotal, 0, 10000000)
+        && isValidNumberRange(data.partsTotal, 0, 10000000)
+        && isValidNumberRange(data.taxAmount, 0, 10000000)
+        && isValidNumberRange(data.totalAmount, 0, 10000000)
+        && (!('amountPaid' in data) || isValidNumberRange(data.amountPaid, 0, 10000000))
+        && (!('paymentStatus' in data) || (data.paymentStatus in ['Pendiente', 'Abonado', 'Pagado']))
+        && (!('paymentNotes' in data) || (data.paymentNotes is string && data.paymentNotes.size() <= 200))
+        && (!('mechanicCommissionRate' in data) || isValidNumberRange(data.mechanicCommissionRate, 0, 100))
+        && (!('mechanicPaid' in data) || isValidNumberRange(data.mechanicPaid, 0, 10000000))
+        && (!('mechanicPaymentStatus' in data) || (data.mechanicPaymentStatus in ['Pendiente', 'Abonado', 'Pagado']))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidWorkOrderItem(data) {
+      return data.keys().hasAll(['ownerId', 'orderId', 'type', 'partId', 'description', 'quantity', 'unitPrice', 'subtotal', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'orderId', 'type', 'partId', 'description', 'quantity', 'unitPrice', 'costPrice', 'subtotal', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && isValidId(data.orderId)
+        && data.type in ['Mano de Obra', 'Repuesto']
+        && data.partId is string && data.partId.size() <= 128
+        && data.description is string && data.description.size() >= 2 && data.description.size() <= 150
+        && isValidNumberRange(data.quantity, 0.01, 10000)
+        && isValidNumberRange(data.unitPrice, 0, 1000000)
+        && (!('costPrice' in data) || isValidNumberRange(data.costPrice, 0, 1000000))
+        && isValidNumberRange(data.subtotal, 0, 10000000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAppointment(data) {
+      return data.keys().hasAll([
+          'ownerId', 'customerId', 'customerName', 'vehicleId', 'vehicleSummary',
+          'plate', 'serviceType', 'scheduledDate', 'scheduledTime', 'bay',
+          'notes', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'customerId', 'customerName', 'vehicleId', 'vehicleSummary',
+          'plate', 'serviceType', 'scheduledDate', 'scheduledTime', 'bay',
+          'notes', 'status', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && isValidId(data.customerId)
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 100
+        && isValidId(data.vehicleId)
+        && data.vehicleSummary is string && data.vehicleSummary.size() >= 2 && data.vehicleSummary.size() <= 120
+        && data.plate is string && data.plate.size() >= 2 && data.plate.size() <= 20
+        && data.serviceType is string && data.serviceType.size() >= 2 && data.serviceType.size() <= 120
+        && data.scheduledDate is string && data.scheduledDate.size() >= 8 && data.scheduledDate.size() <= 20
+        && data.scheduledTime is string && data.scheduledTime.size() >= 4 && data.scheduledTime.size() <= 10
+        && data.bay is string && data.bay.size() <= 30
+        && data.notes is string && data.notes.size() <= 400
+        && data.status in ['Programada', 'Confirmada', 'En Taller', 'Completada', 'Cancelada']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidQuote(data) {
+      return data.keys().hasAll([
+          'ownerId', 'quoteNumber', 'customerId', 'customerName', 'customerPhone',
+          'vehicleId', 'vehicleSummary', 'plate', 'validUntil', 'notes', 'status',
+          'convertedOrderId', 'laborTotal', 'partsTotal', 'taxAmount', 'totalAmount',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerId', 'quoteNumber', 'customerId', 'customerName', 'customerPhone',
+          'vehicleId', 'vehicleSummary', 'plate', 'validUntil', 'notes', 'status',
+          'convertedOrderId', 'laborTotal', 'partsTotal', 'taxAmount', 'totalAmount',
+          'amountPaid', 'paymentStatus', 'paymentNotes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && data.quoteNumber is string && data.quoteNumber.size() >= 2 && data.quoteNumber.size() <= 30
+        && data.customerId is string && data.customerId.size() <= 128
+        && (data.customerId == '' || isValidId(data.customerId))
+        && data.customerName is string && data.customerName.size() >= 2 && data.customerName.size() <= 100
+        && data.customerPhone is string && data.customerPhone.size() <= 30
+        && data.vehicleId is string && data.vehicleId.size() <= 128
+        && (data.vehicleId == '' || isValidId(data.vehicleId))
+        && data.vehicleSummary is string && data.vehicleSummary.size() >= 2 && data.vehicleSummary.size() <= 120
+        && data.plate is string && data.plate.size() <= 20
+        && data.validUntil is string && data.validUntil.size() <= 30
+        && data.notes is string && data.notes.size() <= 800
+        && data.status in ['Borrador', 'Enviado', 'Aprobado', 'Rechazado', 'Convertido']
+        && data.convertedOrderId is string && data.convertedOrderId.size() <= 128
+        && isValidNumberRange(data.laborTotal, 0, 10000000)
+        && isValidNumberRange(data.partsTotal, 0, 10000000)
+        && isValidNumberRange(data.taxAmount, 0, 10000000)
+        && isValidNumberRange(data.totalAmount, 0, 10000000)
+        && (!('amountPaid' in data) || isValidNumberRange(data.amountPaid, 0, 10000000))
+        && (!('paymentStatus' in data) || (data.paymentStatus in ['Pendiente', 'Abonado', 'Pagado']))
+        && (!('paymentNotes' in data) || (data.paymentNotes is string && data.paymentNotes.size() <= 200))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidQuoteItem(data) {
+      return data.keys().hasAll(['ownerId', 'quoteId', 'type', 'partId', 'description', 'quantity', 'unitPrice', 'subtotal', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['ownerId', 'quoteId', 'type', 'partId', 'description', 'quantity', 'unitPrice', 'costPrice', 'subtotal', 'createdAt', 'updatedAt'])
+        && isValidId(data.ownerId)
+        && data.ownerId == request.auth.uid
+        && isValidId(data.quoteId)
+        && data.type in ['Mano de Obra', 'Repuesto']
+        && data.partId is string && data.partId.size() <= 128
+        && data.description is string && data.description.size() >= 2 && data.description.size() <= 150
+        && isValidNumberRange(data.quantity, 0.01, 10000)
+        && isValidNumberRange(data.unitPrice, 0, 1000000)
+        && (!('costPrice' in data) || isValidNumberRange(data.costPrice, 0, 1000000))
+        && isValidNumberRange(data.subtotal, 0, 10000000)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list, create, update, delete: if false;
+    }
+
+    match /shops/{shopId} {
+      allow get: if isSignedIn() && isValidId(shopId) && (shopId == request.auth.uid || (resource != null && existing().ownerId == request.auth.uid) || isAdmin());
+      allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+      allow create: if isSignedIn()
+        && isValidId(shopId)
+        && isValidShop(incoming())
+        && shopId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isSignedIn()
+        && isValidId(shopId)
+        && isValidShop(incoming())
+        && existing().ownerId == request.auth.uid
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'address', 'taxRate', 'currency', 'baysCount', 'bcvRate', 'bcvUpdatedAt', 'bcvSource', 'mechanicCommissionRate', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['bcvRate', 'bcvUpdatedAt', 'bcvSource', 'updatedAt']) ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['mechanicCommissionRate', 'updatedAt'])
+        );
+      allow delete: if false;
+
+      match /customers/{customerId} {
+        allow get: if isSignedIn() && isValidId(shopId) && isValidId(customerId) && (isShopOwner(shopId) || isAdmin());
+        allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(shopId) && isValidId(customerId)
+          && isValidCustomer(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId);
+        allow update: if isSignedIn()
+          && isValidId(shopId) && isValidId(customerId)
+          && isValidCustomer(incoming())
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (
+            isAdmin() ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'email', 'taxId', 'notes', 'updatedAt'])
+          );
+        allow delete: if isSignedIn() && isValidId(shopId) && isValidId(customerId) && isShopOwner(shopId);
+      }
+
+      match /vehicles/{vehicleId} {
+        allow get: if isSignedIn() && isValidId(shopId) && isValidId(vehicleId) && (isShopOwner(shopId) || isAdmin());
+        allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(shopId) && isValidId(vehicleId)
+          && isValidVehicle(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && existsAfter(/databases/$(database)/documents/shops/$(shopId)/customers/$(incoming().customerId));
+        allow update: if isSignedIn()
+          && isValidId(shopId) && isValidId(vehicleId)
+          && isValidVehicle(incoming())
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (
+            isAdmin() ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['customerId', 'customerName', 'plate', 'make', 'model', 'year', 'vin', 'color', 'fuelType', 'mileage', 'updatedAt'])
+          );
+        allow delete: if isSignedIn() && isValidId(shopId) && isValidId(vehicleId) && isShopOwner(shopId);
+      }
+
+      match /mechanics/{mechanicId} {
+        allow get: if isSignedIn() && isValidId(shopId) && isValidId(mechanicId) && (isShopOwner(shopId) || isAdmin());
+        allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(shopId) && isValidId(mechanicId)
+          && isValidMechanic(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId);
+        allow update: if isSignedIn()
+          && isValidId(shopId) && isValidId(mechanicId)
+          && isValidMechanic(incoming())
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (
+            isAdmin() ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'specialty', 'bay', 'phone', 'status', 'commissionRate', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          );
+        allow delete: if isSignedIn() && isValidId(shopId) && isValidId(mechanicId) && isShopOwner(shopId);
+      }
+
+      match /parts/{partId} {
+        allow get: if isSignedIn() && isValidId(shopId) && isValidId(partId) && (isShopOwner(shopId) || isAdmin());
+        allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(shopId) && isValidId(partId)
+          && isValidPart(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId);
+        allow update: if isSignedIn()
+          && isValidId(shopId) && isValidId(partId)
+          && isValidPart(incoming())
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (
+            isAdmin() ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['sku', 'name', 'category', 'stock', 'minStock', 'costPrice', 'salePrice', 'location', 'updatedAt']) ||
+            incoming().diff(existing()).affectedKeys().hasOnly(['stock', 'updatedAt'])
+          );
+        allow delete: if isSignedIn() && isValidId(shopId) && isValidId(partId) && isShopOwner(shopId);
+      }
+
+      match /workOrders/{orderId} {
+        allow get: if isSignedIn() && isValidId(shopId) && isValidId(orderId) && (isShopOwner(shopId) || isAdmin());
+        allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(shopId) && isValidId(orderId)
+          && isValidWorkOrder(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && existsAfter(/databases/$(database)/documents/shops/$(shopId)/customers/$(incoming().customerId))
+          && existsAfter(/databases/$(database)/documents/shops/$(shopId)/vehicles/$(incoming().vehicleId));
+        allow update: if isSignedIn()
+          && isValidId(shopId) && isValidId(orderId)
+          && isValidWorkOrder(incoming())
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().orderNumber == existing().orderNumber
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (
+            isAdmin() ||
+            (
+              existing().status != 'Cancelado' && (
+                incoming().diff(existing()).affectedKeys().hasOnly(['amountPaid', 'paymentStatus', 'paymentNotes', 'updatedAt']) ||
+                incoming().diff(existing()).affectedKeys().hasOnly(['mechanicCommissionRate', 'mechanicPaid', 'mechanicPaymentStatus', 'updatedAt'])
+              )
+            ) ||
+            (
+              !(existing().status in ['Entregado', 'Cancelado']) && (
+                incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+                incoming().diff(existing()).affectedKeys().hasOnly(['mechanicId', 'mechanicName', 'bay', 'diagnosis', 'priority', 'promisedDate', 'mileageIn', 'symptom', 'status', 'updatedAt']) ||
+                incoming().diff(existing()).affectedKeys().hasOnly(['laborTotal', 'partsTotal', 'taxAmount', 'totalAmount', 'updatedAt']) ||
+                incoming().diff(existing()).affectedKeys().hasOnly(['laborTotal', 'partsTotal', 'taxAmount', 'totalAmount', 'paymentStatus', 'updatedAt'])
+              )
+            )
+          );
+        allow delete: if isSignedIn() && isValidId(shopId) && isValidId(orderId) && isShopOwner(shopId)
+          && (!(existing().status in ['Entregado']) || isAdmin());
+
+        match /items/{itemId} {
+          allow get: if isSignedIn() && isValidId(shopId) && isValidId(orderId) && isValidId(itemId) && (isShopOwner(shopId) || isAdmin());
+          allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+          allow create: if isSignedIn()
+            && isValidId(shopId) && isValidId(orderId) && isValidId(itemId)
+            && isValidWorkOrderItem(incoming())
+            && incoming().orderId == orderId
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && isShopOwner(shopId)
+            && existsAfter(/databases/$(database)/documents/shops/$(shopId)/workOrders/$(orderId));
+          allow update: if isSignedIn()
+            && isValidId(shopId) && isValidId(orderId) && isValidId(itemId)
+            && isValidWorkOrderItem(incoming())
+            && existing().ownerId == request.auth.uid
+            && incoming().ownerId == existing().ownerId
+            && incoming().orderId == existing().orderId
+            && incoming().createdAt == existing().createdAt
+            && incoming().updatedAt == request.time
+            && isShopOwner(shopId)
+            && (
+              isAdmin() ||
+              (
+                !(get(/databases/$(database)/documents/shops/$(shopId)/workOrders/$(orderId)).data.status in ['Entregado', 'Cancelado']) &&
+                incoming().diff(existing()).affectedKeys().hasOnly(['type', 'partId', 'description', 'quantity', 'unitPrice', 'costPrice', 'subtotal', 'updatedAt'])
+              )
+            );
+          allow delete: if isSignedIn()
+            && isValidId(shopId) && isValidId(orderId) && isValidId(itemId)
+            && isShopOwner(shopId)
+            && (
+              isAdmin() ||
+              !(get(/databases/$(database)/documents/shops/$(shopId)/workOrders/$(orderId)).data.status in ['Entregado', 'Cancelado'])
+            );
+        }
+      }
+
+      match /appointments/{appointmentId} {
+        allow get: if isSignedIn() && isValidId(shopId) && isValidId(appointmentId) && (isShopOwner(shopId) || isAdmin());
+        allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(shopId) && isValidId(appointmentId)
+          && isValidAppointment(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && existsAfter(/databases/$(database)/documents/shops/$(shopId)/customers/$(incoming().customerId))
+          && existsAfter(/databases/$(database)/documents/shops/$(shopId)/vehicles/$(incoming().vehicleId));
+        allow update: if isSignedIn()
+          && isValidId(shopId) && isValidId(appointmentId)
+          && isValidAppointment(incoming())
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (
+            isAdmin() ||
+            (
+              !(existing().status in ['Completada', 'Cancelada']) && (
+                incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+                incoming().diff(existing()).affectedKeys().hasOnly(['serviceType', 'scheduledDate', 'scheduledTime', 'bay', 'notes', 'status', 'updatedAt'])
+              )
+            )
+          );
+        allow delete: if isSignedIn() && isValidId(shopId) && isValidId(appointmentId) && isShopOwner(shopId);
+      }
+
+      match /quotes/{quoteId} {
+        allow get: if isSignedIn() && isValidId(shopId) && isValidId(quoteId) && (isShopOwner(shopId) || isAdmin());
+        allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+        allow create: if isSignedIn()
+          && isValidId(shopId) && isValidId(quoteId)
+          && isValidQuote(incoming())
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (incoming().customerId == '' || existsAfter(/databases/$(database)/documents/shops/$(shopId)/customers/$(incoming().customerId)))
+          && (incoming().vehicleId == '' || existsAfter(/databases/$(database)/documents/shops/$(shopId)/vehicles/$(incoming().vehicleId)));
+        allow update: if isSignedIn()
+          && isValidId(shopId) && isValidId(quoteId)
+          && isValidQuote(incoming())
+          && existing().ownerId == request.auth.uid
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().quoteNumber == existing().quoteNumber
+          && incoming().updatedAt == request.time
+          && isShopOwner(shopId)
+          && (
+            isAdmin() ||
+            (
+              existing().status != 'Rechazado' &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['amountPaid', 'paymentStatus', 'paymentNotes', 'updatedAt'])
+            ) ||
+            (
+              !(existing().status in ['Convertido']) && (
+                incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']) ||
+                incoming().diff(existing()).affectedKeys().hasOnly(['status', 'convertedOrderId', 'updatedAt']) ||
+                incoming().diff(existing()).affectedKeys().hasOnly([
+                  'customerId', 'customerName', 'customerPhone', 'vehicleId', 'vehicleSummary',
+                  'plate', 'validUntil', 'notes', 'status', 'laborTotal', 'partsTotal',
+                  'taxAmount', 'totalAmount', 'amountPaid', 'paymentStatus', 'paymentNotes', 'updatedAt'
+                ])
+              )
+            )
+          );
+        allow delete: if isSignedIn() && isValidId(shopId) && isValidId(quoteId) && isShopOwner(shopId)
+          && (!(existing().status in ['Convertido']) || isAdmin());
+
+        match /items/{itemId} {
+          allow get: if isSignedIn() && isValidId(shopId) && isValidId(quoteId) && isValidId(itemId) && (isShopOwner(shopId) || isAdmin());
+          allow list: if isSignedIn() && existing().ownerId == request.auth.uid;
+          allow create: if isSignedIn()
+            && isValidId(shopId) && isValidId(quoteId) && isValidId(itemId)
+            && isValidQuoteItem(incoming())
+            && incoming().quoteId == quoteId
+            && incoming().createdAt == request.time
+            && incoming().updatedAt == request.time
+            && isShopOwner(shopId)
+            && existsAfter(/databases/$(database)/documents/shops/$(shopId)/quotes/$(quoteId));
+          allow update: if isSignedIn()
+            && isValidId(shopId) && isValidId(quoteId) && isValidId(itemId)
+            && isValidQuoteItem(incoming())
+            && existing().ownerId == request.auth.uid
+            && incoming().ownerId == existing().ownerId
+            && incoming().quoteId == existing().quoteId
+            && incoming().createdAt == existing().createdAt
+            && incoming().updatedAt == request.time
+            && isShopOwner(shopId)
+            && (
+              isAdmin() ||
+              (
+                !(get(/databases/$(database)/documents/shops/$(shopId)/quotes/$(quoteId)).data.status in ['Convertido']) &&
+                incoming().diff(existing()).affectedKeys().hasOnly(['type', 'partId', 'description', 'quantity', 'unitPrice', 'costPrice', 'subtotal', 'updatedAt'])
+              )
+            );
+          allow delete: if isSignedIn()
+            && isValidId(shopId) && isValidId(quoteId) && isValidId(itemId)
+            && isShopOwner(shopId)
+            && (
+              isAdmin() ||
+              !(get(/databases/$(database)/documents/shops/$(shopId)/quotes/$(quoteId)).data.status in ['Convertido'])
+            );
+        }
+      }
+    }
+  }
+}
